@@ -1,0 +1,526 @@
+---
+title: "Dashboard en R"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+    theme: spacelab
+    social: [ "menu" ]
+    # logo: logo-image.png
+    # favicon: favicon-image.png
+
+---
+
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+rm(list = ls())
+
+library(dplyr)
+library(devtools)
+install_github("daroczig/binancer")
+library(binancer)
+library (magrittr)
+library(plotly)
+library(flexdashboard)
+library (kableExtra)
+library (dygraphs)
+library (xts)
+library (lubridate)
+library (tidyverse)
+library(TTR)
+library (tidyverse)
+library (forecast)
+library (scales)
+library(heatmaply)
+library (stats)
+library (vars)
+library (utils)
+
+
+options(scipen=999)
+```
+
+```{r, include=FALSE}
+clave <- ""
+llave <- ""
+binance_ping()
+binance_credentials(clave, llave)
+```
+```{r, include=FALSE}
+data <- binance_klines('BTCUSDT', interval = '1d')
+x <- data$open_time
+y <- data %>% dplyr::select(open, high, low, close) %>% as.matrix
+data %>% plot_ly(x = data$open_time, type="candlestick",
+          open = data$open, close = data$close,
+          high = data$high, low = data$low) %>%
+             layout(title = "Candlestick Chart")
+```
+<!-- Obtención de Base de Datos COVID19 -->
+<!-- Se utilizará la tabla de la 'Covid19_ecdpc.csv' para  el presente proyecto -->
+
+```{r, include=FALSE}
+covid19 <- read.csv("https://opendata.ecdc.europa.eu/covid19/casedistribution/csv", na.strings = "", fileEncoding = "UTF-8-BOM")
+head(covid19)
+```
+<!-- Exploración de los datos de COVID19 a nivel mundial -->
+<!-- Es necesario revisar todo el dataset: -->
+
+```{r, include=FALSE}
+str(covid19)
+```
+<!-- Cambiaremos el tipo de datos en la fecha, de tipo "chr" a "date" -->
+
+```{r, include=FALSE}
+covid19$dateRep %<>% dmy()
+str(covid19)
+```
+<!-- Y comenzamos con la búsqueda de datos anómalos. -->
+<!-- Recordando siempre "Keep it Simple" -->
+
+```{r, include=FALSE}
+covid19 %>%
+  dplyr::filter (cases <  0)
+```
+
+```{r, include=FALSE}
+covid19 %>%
+  dplyr::filter (deaths <  0)
+```
+```{r, include=FALSE}
+covid19 %>%
+  dplyr::filter (popData2019 < 0)
+```
+<!-- Tenemos algunos casos donde existen casos Negativos y Decesos negativos, lo cual son datos inconsistentes para nuestro procesamiento. -->
+
+```{r, include=FALSE}
+covid19_zonas <- covid19 %>%
+  dplyr::select(dateRep,cases,deaths,countriesAndTerritories, countryterritoryCode,continentExp) %>% 
+  group_by(dateRep) %>% 
+  filter (cases >= 0) %>% 
+  filter (deaths >= 0)
+
+head(covid19_zonas)
+```
+```{r , include=FALSE}
+summary(covid19_zonas)
+```
+```{r,include=FALSE}
+sum(is.na(covid19_zonas))
+```
+
+```{r, include=FALSE}
+sum(is.na(covid19_zonas$dateRep))
+sum(is.na(covid19_zonas$cases))
+sum(is.na(covid19_zonas$deaths))
+sum(is.na(covid19_zonas$countriesAndTerritories))
+sum(is.na(covid19_zonas$countryterritoryCode))
+sum(is.na(covid19_zonas$continentExp))
+```
+```{r, include=FALSE}
+unique(covid19_zonas$countriesAndTerritories)
+```
+
+```{r, include=FALSE}
+unique(covid19_zonas$continentExp)
+```
+<!-- Agrupar Europa -->
+
+```{r, include=FALSE}
+covid_ue <- covid19_zonas %>% 
+  dplyr::filter(continentExp == 'Europe') %>% 
+  summarise(casosSum = sum(cases), decSum = sum(deaths)) %>% 
+  mutate (AcumuladoCasos = cumsum(casosSum), AcumuladoDecesos = cumsum(decSum))
+```
+
+<!-- Agrupar Estados Unidos -->
+```{r, include=FALSE}
+covid_usa <- covid19_zonas %>% 
+  dplyr::filter(countryterritoryCode == 'USA') %>% 
+  summarise(casosSum = sum(cases), decSum = sum(deaths)) %>% 
+  mutate (AcumuladoCasos = cumsum(casosSum), AcumuladoDecesos = cumsum(decSum))
+```
+
+<!-- Agrupar China -->
+```{r, include=FALSE}
+covid_china <- covid19_zonas %>% 
+  dplyr::filter(countriesAndTerritories == 'China') %>% 
+  summarise(casosSum = sum(cases), decSum = sum(deaths)) %>% 
+  mutate (AcumuladoCasos = cumsum(casosSum), AcumuladoDecesos = cumsum(decSum))
+```
+<!-- Agrupar Japón -->
+```{r, include=FALSE}
+covid_japon <- covid19_zonas %>% 
+  dplyr::filter(countriesAndTerritories == 'Japan') %>% 
+  summarise(casosSum = sum(cases), decSum = sum(deaths)) %>% 
+  mutate (AcumuladoCasos = cumsum(casosSum), AcumuladoDecesos = cumsum(decSum))
+```
+
+<!-- Vamos a seleccionar los datos que son realmente importantes para nuestro estudio -->
+
+```{r, include=FALSE}
+covid_w <- covid19 %>%
+  dplyr::select(dateRep,cases,deaths) %>% 
+  group_by(dateRep) %>% 
+  summarise(casosSum = sum(cases), decSum = sum(deaths)) %>%
+  mutate(AcumuladoCasos = cumsum(casosSum), AcumuladoDecesos = cumsum(decSum))
+head(covid_w)
+```
+```{r, include=FALSE}
+plot( x = covid_w$dateRep, covid_w$AcumuladoCasos, type = "l", xlab = 'Fecha', ylab='Casos Acumulados', col = "blue", main = "Covid 19 Casos Mundiales")
+```
+<!-- Gráfica de Casos Acumulados y Suavizamiento -->
+
+```{r, include=FALSE}
+options(scipen = 999999)
+#dateWindow <- c("2019-12-31", "2020-12-11")
+
+covid_w_xts <- xts((covid_w$casosSum), order.by = covid_w$dateRep)
+
+dygraph(covid_w_xts, main = "Casos nuevos a nivel mundial") %>%
+  dyAxis("x", label="Mes") %>%
+  dyAxis("y", valueRange = c(0,750000)) %>%
+  #dyRangeSelector(dateWindow=dateWindow) %>% 
+  dyRoller(showRoller = TRUE, rollPeriod = 1)
+
+```
+```{r, include =FALSE}
+com_covid <- xts(data.frame(covid_china$casosSum,covid_japon$casosSum,covid_ue$casosSum,covid_usa$casosSum),order.by=covid_usa$dateRep)
+
+dygraph(com_covid) %>%
+  dyAxis("x", label="Mes") %>%
+  dyAxis("y", valueRange = c(0,400000)) %>% 
+  dyRoller(showRoller = TRUE, rollPeriod = 1)
+
+```
+```{r, include=FALSE}
+covid_rm <- rollmean(covid_w_xts, 5)
+str(covid_rm)
+```
+
+```{r, include=FALSE}
+data_wk <- data %>% 
+  dplyr::filter(data$open_time >= '2019-12-30') %>%  #Depending on the datetime you are using this code, due to time zones, we might get different shape to join dataframes, please be aware and change from December 30th to December 31st
+  dplyr::select('open_time','close')
+
+df <- covid_w %>% 
+  bind_cols(data_wk) %>% 
+  subset(select = -c(open_time))
+names(df)[names(df) == "close"] <- "BTCUSDT"
+head(df)
+```
+```{r, include=FALSE}
+# Cambio de nombres para CHINA
+names(covid_china)[names(covid_china) == "dateRep"] <- "Date"
+names(covid_china)[names(covid_china) == "casosSum"] <- "CHN_NewCases"
+names(covid_china)[names(covid_china) == "decSum"] <- "CHN_Newdeaths"
+names(covid_china)[names(covid_china) == "AcumuladoCasos"] <- "CHN_AcuCases"
+names(covid_china)[names(covid_china) == "AcumuladoDecesos"] <- "CHN_AcuDeaths"
+
+#Cambio de nombres JAPON
+names(covid_japon)[names(covid_japon) == "casosSum"] <- "JAP_NewCases"
+names(covid_japon)[names(covid_japon) == "decSum"] <- "JAP_Newdeaths"
+names(covid_japon)[names(covid_japon) == "AcumuladoCasos"] <- "JAP_AcuCases"
+names(covid_japon)[names(covid_japon) == "AcumuladoDecesos"] <- "JAP_AcuDeaths"
+
+#Cambio de nombres EUROPA
+names(covid_ue)[names(covid_ue) == "casosSum"] <- "EU_NewCases"
+names(covid_ue)[names(covid_ue) == "decSum"] <- "EU_Newdeaths"
+names(covid_ue)[names(covid_ue) == "AcumuladoCasos"] <- "EU_AcuCases"
+names(covid_ue)[names(covid_ue) == "AcumuladoDecesos"] <- "EU_AcuDeaths"
+
+#Cambio de nombres USA
+names(covid_usa)[names(covid_usa) == "casosSum"] <- "USA_NewCases"
+names(covid_usa)[names(covid_usa) == "decSum"] <- "USA_Newdeaths"
+names(covid_usa)[names(covid_usa) == "AcumuladoCasos"] <- "USA_AcuCases"
+names(covid_usa)[names(covid_usa) == "AcumuladoDecesos"] <- "USA_AcuDeaths"
+```
+
+```{r, include=FALSE}
+names(covid_china)
+names(covid_japon)
+names(covid_ue)
+names(covid_usa)
+```
+
+```{r, include=FALSE}
+df_com <- covid_china %>% 
+  bind_cols(covid_japon) %>% 
+  subset(select = -c(dateRep))%>% 
+  bind_cols(covid_ue) %>% 
+  subset(select = -c(dateRep))%>% 
+  bind_cols(covid_usa) %>% 
+  subset(select = -c(dateRep))
+
+head(df_com)
+```
+```{r, include=FALSE}
+names(df_com)
+```
+```{r, include=FALSE}
+DF <- df_com %>% 
+  bind_cols(data_wk) %>% 
+  subset(select = -c(open_time))
+names(DF)[names(DF) == "close"] <- "BTCUSDT"
+DF
+```
+```{r, include = FALSE}
+DF_2 <- DF %>%
+    subset(select = -c(Date))
+DF2 <- cor(DF_2)
+DF2
+```
+```{r,include=FALSE}
+heatmaply_cor(
+  cor(DF_2),
+  k_col = 1, 
+  k_row = 1
+)
+
+```
+
+```{r, include=FALSE}
+cor(df$casosSum,df$BTCUSDT)
+```
+```{r, include=FALSE}
+cor.test(df$casosSum,df$BTCUSDT)
+```
+```{r, include = FALSE}
+fig <- plot_ly(df, x = ~casosSum, y = ~BTCUSDT,
+       type = 'scatter', mode = 'markers', 
+       colors = 'Paired',
+       marker = list(opacity = 0.5, sizemode = 'diameter')) %>% 
+       layout(layouttitle = 'Covid New Cases vs BTCUSDT',
+              xaxis = list(showgrid = FALSE),
+              yaxis = list(showgrid = FALSE),
+              showlegend = FALSE)
+fig
+
+```
+
+
+
+
+
+
+
+
+
+
+BTCUSDT vs COVID: COMPARATIVE
+========================================================================
+
+Row 
+-----------------------------------------------------------------------
+
+### BTC value in US Dollars
+
+```{r, echo=FALSE}
+
+data_wk_xts <- xts(data_wk$close, order.by = data_wk$open_time)
+dygraph(data_wk_xts, main = "BTCUSDT Value") %>%
+  dyAxis("x", label="Mes") %>% 
+  dyRoller(showRoller = TRUE, rollPeriod = 1)
+
+```
+
+### Covid New Cases
+
+```{r, echo=FALSE}
+dygraph(covid_w_xts, main = "COVID19 WORLD NEW CASES") %>%
+  dyAxis("x", label="Mes") %>%
+  dyAxis("y", valueRange = c(0,750000)) %>%
+  dyRoller(showRoller = TRUE, rollPeriod = 1)
+
+```
+
+
+Row 
+-----------------------------------------------------------------------
+
+### Strongest Economies (USA, CHINA, JAPAN, EUROPEAN UNION)
+
+```{r, echo=FALSE}
+dygraph(com_covid, main = "WORLD ECONOMIES NEW CASES") %>%
+  dyAxis("x", label="Mes") %>%
+  dyAxis("y", valueRange = c(0,400000)) %>% 
+  dyRoller(showRoller = TRUE, rollPeriod = 1)
+```
+
+CORRELATION
+================================================================================
+
+Row {data-height=650}
+--------------------------------------------------------------------------------
+
+### COVID WORLD CASES VS BTCUSDT
+
+```{r, echo=FALSE}
+fig <- plot_ly(df, x = ~casosSum, y = ~BTCUSDT,
+       type = 'scatter', mode = 'markers', 
+       colors = 'Paired',
+       marker = list(opacity = 0.5, sizemode = 'diameter')) %>% 
+       layout(layouttitle = 'Covid New Cases vs BTCUSDT',
+              xaxis = list(showgrid = FALSE),
+              yaxis = list(showgrid = FALSE),
+              showlegend = FALSE)
+fig
+```
+
+### COVID DEATHS VS BTCUSDT
+
+```{r, echo=FALSE}
+
+heatmaply_cor(
+  cor(DF_2),
+  k_col = 1, 
+  k_row = 1
+)
+
+
+# fig <- plot_ly(df, x = ~decSum, y = ~BTCUSDT,
+#        type = 'scatter', mode = 'markers', 
+#        colors = 'Paired',
+#        marker = list(opacity = 0.5, sizemode = 'diameter')) %>% 
+#        layout(layouttitle = 'Covid New Deaths vs BTCUSDT',
+#               xaxis = list(showgrid = FALSE),
+#               yaxis = list(showgrid = FALSE),
+#               showlegend = FALSE)
+# fig
+```
+
+Row {.tabset .tabset-fade}
+--------------------------------------------------------------------------------
+
+### USA COVID CASES VS BTCUSDT
+```{r, echo=FALSE}
+fig <- plot_ly(DF, x = ~USA_NewCases, y = ~BTCUSDT, text = ~Date,
+       type = 'scatter', mode = 'markers', 
+       colors = 'Paired',
+       marker = list(opacity = 0.5, sizemode = 'diameter')) %>% 
+       layout(layouttitle = 'Covid USA Cases vs BTCUSDT',
+              xaxis = list(showgrid = FALSE),
+              yaxis = list(showgrid = FALSE),
+              showlegend = FALSE)
+fig
+```
+
+### EUROPE COVID NEW CASES
+
+```{r, echo=FALSE}
+fig <- plot_ly(
+  DF, x = ~EU_NewCases, y = ~BTCUSDT, text = ~Date, 
+  type = 'scatter', mode = 'markers', 
+  color = ~Date, colors = 'Paired',
+  marker = list(opacity = 0.5, sizemode = 'diameter')
+) %>% 
+  layout(
+    title = 'Covid EUROPE Cases vs BTCUSDT',
+    xaxis = list(showgrid = FALSE),
+    yaxis = list(showgrid = FALSE),
+    showlegend = FALSE
+)
+
+fig
+```
+### CHINA COVID CASES VS BTCUSDT
+
+```{r, echo=FALSE}
+fig <- plot_ly(DF, x = ~CHN_NewCases, y = ~BTCUSDT, text = ~Date,
+       type = 'scatter', mode = 'markers', 
+       colors = 'Paired',
+       marker = list(opacity = 0.5, sizemode = 'diameter')) %>% 
+       layout(layouttitle = 'Covid China Cases vs BTCUSDT',
+              xaxis = list(showgrid = FALSE),
+              yaxis = list(showgrid = FALSE),
+              showlegend = FALSE)
+fig
+```
+### JAPAN COVID CASES VS BTCUSDT
+
+```{r, echo=FALSE}
+fig <- plot_ly(DF, x = ~JAP_NewCases, y = ~BTCUSDT, text = ~Date,
+       type = 'scatter', mode = 'markers', 
+       colors = 'Paired',
+       marker = list(opacity = 0.5, sizemode = 'diameter')) %>% 
+       layout(layouttitle = 'Covid Japan Cases vs BTCUSDT',
+              xaxis = list(showgrid = FALSE),
+              yaxis = list(showgrid = FALSE),
+              showlegend = FALSE)
+fig
+```
+
+
+
+
+ABOUT
+================================================================================
+
+
+Column {data-width = 300}
+--------------------------------------------------------------------------------
+
+### BTCUSDT vs New Cases
+
+```{r,echo=FALSE}
+
+# CovidNew <- covid_w_xts
+# BTCUSDT <- data_wk_xts
+# CoBit <- cbind(BTCUSDT, CovidNew)
+# dygraph(CoBit)
+```
+
+
+
+
+
+Row 
+--------------------------------------------------------------------------------
+
+### COMMENTS
+
+  BTCUSDT has been increasing its value despite of the global economic markets.
+  
+  As COVID19 cases increase, BTCUSDT has becoming stronger, this could be explained
+  because "regular" markets had been having troubles on recovering since the whole 
+  world "freezed up" with many restrictions.
+  
+  People started working more online and trying to earn money on different ways. One
+  of them could be CRYPTOTRADING, considering that BITCOIN was the first one, and 
+  is the strongest one, people wouldn't want to lose and it is kind of a good bet
+  buying BITCOINS in a longterm as an investment.
+  
+  
+  
+  
+### DEVELOPMENT
+
+  UNIVERSIDAD DE SONORA
+  
+  Maestria en Ciencia de Datos
+  
+  Ingenieria de Caracteristicas
+  
+  
+  Victor Manuel Ibarra Encinas
+  
+
+  
+
+Row
+--------------------------------------------------------------------------------
+
+### DATA
+
+SOURCES:
+  
+  COVID DATA
+  
+  https://opendata.ecdc.europa.eu/covid19/casedistribution/csv
+  
+  CRIPTOCURRENCY
+  
+  https://www.binance.com/
+  
