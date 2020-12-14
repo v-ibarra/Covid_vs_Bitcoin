@@ -1,5 +1,5 @@
 ---
-title: "Dashboard en R"
+title: "COVID19 CASES VS BTCUSDT"
 output: 
   flexdashboard::flex_dashboard:
     orientation: rows
@@ -44,6 +44,7 @@ options(scipen=999)
 ```
 
 ```{r, include=FALSE}
+# USE YOUR CREDENTIALS #
 clave <- ""
 llave <- ""
 binance_ping()
@@ -309,7 +310,7 @@ fig
 
 
 
-BTCUSDT vs COVID: COMPARATIVE
+BTCUSDT vs COVID
 ========================================================================
 
 Row 
@@ -349,7 +350,7 @@ dygraph(com_covid, main = "WORLD ECONOMIES NEW CASES") %>%
   dyRoller(showRoller = TRUE, rollPeriod = 1)
 ```
 
-CORRELATION
+COMPARATIVE
 ================================================================================
 
 Row {data-height=650}
@@ -372,23 +373,23 @@ fig
 ### COVID DEATHS VS BTCUSDT
 
 ```{r, echo=FALSE}
+#
+# heatmaply_cor(
+#  cor(DF_2),
+#  k_col = 1, 
+#  k_row = 1
+#  )
 
-heatmaply_cor(
-  cor(DF_2),
-  k_col = 1, 
-  k_row = 1
-)
 
-
-# fig <- plot_ly(df, x = ~decSum, y = ~BTCUSDT,
-#        type = 'scatter', mode = 'markers', 
-#        colors = 'Paired',
-#        marker = list(opacity = 0.5, sizemode = 'diameter')) %>% 
-#        layout(layouttitle = 'Covid New Deaths vs BTCUSDT',
-#               xaxis = list(showgrid = FALSE),
-#               yaxis = list(showgrid = FALSE),
-#               showlegend = FALSE)
-# fig
+ fig <- plot_ly(df, x = ~decSum, y = ~BTCUSDT,
+        type = 'scatter', mode = 'markers', 
+        colors = 'Paired',
+        marker = list(opacity = 0.5, sizemode = 'diameter')) %>% 
+        layout(layouttitle = 'Covid New Deaths vs BTCUSDT',
+               xaxis = list(showgrid = FALSE),
+               yaxis = list(showgrid = FALSE),
+               showlegend = FALSE)
+ fig
 ```
 
 Row {.tabset .tabset-fade}
