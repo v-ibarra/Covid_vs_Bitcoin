@@ -37,7 +37,9 @@ Original BTCUSDT dataset contains these columns:
  
  
 For the analysis we have joined our datasets in two different CSV's.
+  
   World_vs_Covid19.csv 
+  
       'dateRep':    Date.
       'casosSum':   New Covid19 cases everyday.
       'decSum':     New Covid19 deaths everyday.
@@ -46,6 +48,7 @@ For the analysis we have joined our datasets in two different CSV's.
       'BTCUSDT':  Bitcoin value on US Dollars
  
   Groups_vs_Covid19.csv
+  
       'Date':       Date
       'CHN_NewCases': New Covid19 cases in China everyday.
       'CHN_NewCases': New Covid19 deaths in China everyday.
