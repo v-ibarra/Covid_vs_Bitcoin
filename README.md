@@ -9,17 +9,31 @@ Data used to make this analysis.
    https://www.binance.com/
    
 Original Covid19 dataset has the following columns:
- [1] "dateRep"                                                    "day"                                                       
- [3] "month"                                                      "year"                                                      
- [5] "cases"                                                      "deaths"                                                    
- [7] "countriesAndTerritories"                                    "geoId"                                                     
- [9] "countryterritoryCode"                                       "popData2019"                                               
-[11] "continentExp"                                               "Cumulative_number_for_14_days_of_COVID.19_cases_per_100000"
+ "dateRep"                                                   
+ "day"                                                       
+ "month"                                                     
+ "year"                                                      
+ "cases"                                                      
+ "deaths"                                                    
+ "countriesAndTerritories"                                    
+ "geoId"                                                     
+ "countryterritoryCode"                                       
+ "popData2019"                                               
+ "continentExp"                                               
+ "Cumulative_number_for_14_days_of_COVID.19_cases_per_100000"
 
 Original BTCUSDT dataset contains these columns:
- [1] "open_time"                    "open"                         "high"                         "low"                         
- [5] "close"                        "volume"                       "close_time"                   "quote_asset_volume"          
- [9] "trades"                       "taker_buy_base_asset_volume"  "taker_buy_quote_asset_volume" "symbol"                
+ "open_time"
+ "open"
+ "high"
+ "low"                         
+ "close"                        
+ "volume"
+ "close_time"                   
+ "quote_asset_volume"          
+ "trades"             
+ "taker_buy_base_asset_volume"
+ "taker_buy_quote_asset_volume" "symbol"                
  
  
 For the analysis we have joined our datasets in two different CSV's.
